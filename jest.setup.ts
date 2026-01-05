@@ -31,6 +31,15 @@ if (!global.MessageEvent) {
   global.MessageEvent = MessageEvent as unknown as typeof global.MessageEvent;
 }
 
+// Ensure performance exists and has markResourceTiming for undici timing hooks.
+if (!globalThis.performance) {
+  globalThis.performance = require('perf_hooks').performance;
+}
+// @ts-expect-error markResourceTiming is optional on the Performance interface
+if (!(globalThis.performance as any).markResourceTiming) {
+  (globalThis.performance as any).markResourceTiming = () => {};
+}
+
 // Use undici's fetch implementation (includes Request/Response with static helpers).
 const { fetch, Headers, Request, Response, FormData, File, setGlobalDispatcher, Agent } =
   require('undici');

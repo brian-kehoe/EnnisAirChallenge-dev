@@ -7,15 +7,13 @@ import { GET } from '@/app/api/air/route';
  * This requires a valid OPENAQ_API_KEY in the environment and network access.
  * Opt-in by setting RUN_REAL_OPENAQ_TESTS=true.
  */
-const describeIfReal = process.env.RUN_REAL_OPENAQ_TESTS === 'true' ? describe : describe.skip;
+const describeIfReal =
+  process.env.RUN_REAL_OPENAQ_TESTS === 'true' && process.env.OPENAQ_API_KEY
+    ? describe
+    : describe.skip;
 
 describeIfReal('TonightGame UI (real OpenAQ)', () => {
   const originalFetch = global.fetch;
-
-  beforeAll(() => {
-    // jsdom lacks this; undici expects it when reporting timings.
-    (global.performance as any).markResourceTiming = (global.performance as any).markResourceTiming ?? (() => {});
-  });
 
   beforeEach(() => {
     global.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
