@@ -19,32 +19,72 @@ export async function GET(req: Request) {
 
   const apiKey = process.env.OPENAQ_API_KEY;
   const coordinates = TOWN_COORDINATES[location];
-  const queryParams = new URLSearchParams();
 
-  if (coordinates) {
-    queryParams.set('coordinates', `${coordinates.lat},${coordinates.lon}`);
-    queryParams.set('radius', '25000');
-    queryParams.set('limit', '1');
-  } else {
-    queryParams.set('location', location);
+  if (!coordinates) {
+    return NextResponse.json({ error: 'Unknown location' }, { status: 400 });
   }
 
-  const url = `https://api.openaq.org/v3/latest?${queryParams.toString()}`;
-
   try {
-    const res = await fetch(url, {
+    // Step 1: Find locations with PM2.5 sensors near the coordinates
+    const locationsParams = new URLSearchParams({
+      coordinates: `${coordinates.lat},${coordinates.lon}`,
+      radius: '25000',
+      limit: '5',
+      parameters_id: '2', // PM2.5 parameter ID
+    });
+
+    const locationsUrl = `https://api.openaq.org/v3/locations?${locationsParams.toString()}`;
+
+    const locationsRes = await fetch(locationsUrl, {
       headers: {
         'x-api-key': apiKey ?? '',
       },
     });
 
-    if (!res.ok) {
-      return NextResponse.json({ pm25: null }, { status: res.status });
+    if (!locationsRes.ok) {
+      return NextResponse.json({ pm25: null }, { status: locationsRes.status });
     }
 
-    const json = await res.json();
-    const pm25 =
-      json?.results?.[0]?.measurements?.find((m: any) => m.parameter === 'pm25')?.value ?? null;
+    const locationsData = await locationsRes.json();
+
+    if (!locationsData.results || locationsData.results.length === 0) {
+      return NextResponse.json({ pm25: null }, { status: 404 });
+    }
+
+    // Step 2: Find a PM2.5 sensor from any of the returned locations
+    let pm25Sensor = null;
+    for (const locationResult of locationsData.results) {
+      pm25Sensor = locationResult.sensors?.find(
+        (sensor: { parameter?: { name?: string } }) => sensor.parameter?.name === 'pm25',
+      );
+      if (pm25Sensor) break;
+    }
+
+    if (!pm25Sensor) {
+      return NextResponse.json({ pm25: null }, { status: 404 });
+    }
+
+    // Step 3: Get the latest measurement from this sensor with explicit ordering
+    const measurementsParams = new URLSearchParams({
+      limit: '1',
+      order_by: 'datetime',
+      sort: 'desc',
+    });
+    const measurementsUrl = `https://api.openaq.org/v3/sensors/${pm25Sensor.id}/measurements?${measurementsParams.toString()}`;
+
+    const measurementsRes = await fetch(measurementsUrl, {
+      headers: {
+        'x-api-key': apiKey ?? '',
+      },
+    });
+
+    if (!measurementsRes.ok) {
+      return NextResponse.json({ pm25: null }, { status: measurementsRes.status });
+    }
+
+    const measurementsData = await measurementsRes.json();
+
+    const pm25 = measurementsData.results?.[0]?.value ?? null;
 
     return NextResponse.json({ pm25 });
   } catch {
