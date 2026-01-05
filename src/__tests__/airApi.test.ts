@@ -1,17 +1,21 @@
 import { GET } from '@/app/api/air/route';
 
-const mockFetch = jest.fn(async () => ({
-  json: async () => ({
-    results: [
-      {
-        measurements: [{ parameter: 'pm25', value: 12.3 }],
-      },
-    ],
-  }),
-})) as jest.Mock;
+describe('API /api/air (mocked upstream)', () => {
+  const mockFetch = jest.fn() as jest.Mock;
 
-describe('API /api/air', () => {
   beforeEach(() => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        results: [
+          {
+            measurements: [{ parameter: 'pm25', value: 12.3 }],
+          },
+        ],
+      }),
+    });
+
     global.fetch = mockFetch;
   });
 
@@ -19,11 +23,30 @@ describe('API /api/air', () => {
     jest.resetAllMocks();
   });
 
-  it('returns pm25 for known location', async () => {
+  it('uses coordinates for known towns and returns pm25', async () => {
     const res = await GET(new Request('http://localhost/api/air?location=Ennis'));
     const json = await res.json();
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('coordinates=52.8436%2C-8.9863'),
+      expect.any(Object),
+    );
     expect(res.status).toBe(200);
     expect(json.pm25).toBe(12.3);
+  });
+
+  it('returns upstream status when fetch is not ok', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 502,
+      json: async () => ({}),
+    });
+
+    const res = await GET(new Request('http://localhost/api/air?location=Galway'));
+    const json = await res.json();
+
+    expect(res.status).toBe(502);
+    expect(json.pm25).toBeNull();
   });
 
   it('fails gracefully on missing param', async () => {
