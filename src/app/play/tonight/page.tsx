@@ -254,6 +254,7 @@ export default function TonightGame() {
   const [isLoading, setIsLoading] = useState(false);
   const [gameComplete, setGameComplete] = useState(false);
   const [score, setScore] = useState(0);
+  const [latestGuess, setLatestGuess] = useState<GuessResult | null>(null);
   const maxGuesses = 6;
 
   useEffect(() => {
@@ -287,9 +288,13 @@ export default function TonightGame() {
         pm25,
         isWorse,
       };
-      
+
       setGuesses(prev => [...prev, newResult]);
-      
+      setLatestGuess(newResult);
+
+      // Auto-clear latest guess notification after 3 seconds
+      setTimeout(() => setLatestGuess(null), 3000);
+
       if (isWorse) {
         setScore(prev => prev + 1);
         // Unlock next region after finding a worse city
@@ -302,10 +307,18 @@ export default function TonightGame() {
           }
         }
       }
-      
+
       if (guesses.length + 1 >= maxGuesses) {
         setGameComplete(true);
       }
+
+      // Scroll to results on mobile after a short delay
+      setTimeout(() => {
+        const resultsElement = document.getElementById('results-section');
+        if (resultsElement) {
+          resultsElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      }, 300);
     } catch {
       // Handle error
     } finally {
@@ -377,13 +390,27 @@ export default function TonightGame() {
 
           {/* Map area */}
           <div className="relative bg-slate-800/30 border border-slate-700 rounded-2xl aspect-[16/10] overflow-hidden mb-8">
-            {/* Map background with gradient */}
-            <div className="absolute inset-0 bg-gradient-to-br from-slate-800 via-slate-800/50 to-slate-900">
+            {/* Map background with gradient and geographic features */}
+            <div className="absolute inset-0 bg-gradient-to-br from-blue-950/40 via-slate-800/50 to-slate-900">
               {/* Subtle grid pattern */}
               <div className="absolute inset-0 opacity-20" style={{
                 backgroundImage: 'radial-gradient(circle at 1px 1px, rgba(255,255,255,0.15) 1px, transparent 0)',
                 backgroundSize: '40px 40px'
               }}></div>
+
+              {/* Simple region indicators based on current view */}
+              {currentRegion === 'ireland' && (
+                <div className="absolute left-[48%] top-[45%] w-16 h-24 border-2 border-emerald-500/30 rounded-full blur-sm"></div>
+              )}
+              {currentRegion === 'uk' && (
+                <div className="absolute left-[45%] top-[40%] w-32 h-40 border-2 border-blue-500/30 rounded-lg blur-sm"></div>
+              )}
+              {currentRegion === 'europe' && (
+                <div className="absolute left-[40%] top-[35%] w-48 h-56 border-2 border-purple-500/30 rounded-xl blur-sm"></div>
+              )}
+              {currentRegion === 'world' && (
+                <div className="absolute inset-4 border-2 border-teal-500/30 rounded-xl blur-sm"></div>
+              )}
             </div>
 
             {/* Ennis marker (always visible) */}
@@ -420,9 +447,36 @@ export default function TonightGame() {
             )}
           </div>
 
+          {/* Toast notification for latest guess */}
+          {latestGuess && (
+            <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 animate-slide-down">
+              <div className={`px-6 py-4 rounded-xl shadow-2xl border-2 ${
+                latestGuess.isWorse
+                  ? 'bg-red-500/90 border-red-400 backdrop-blur-sm'
+                  : latestGuess.isWorse === false
+                    ? 'bg-emerald-500/90 border-emerald-400 backdrop-blur-sm'
+                    : 'bg-slate-700/90 border-slate-600 backdrop-blur-sm'
+              }`}>
+                <div className="flex items-center gap-3">
+                  <div className="text-3xl">
+                    {latestGuess.isWorse ? '💨' : latestGuess.isWorse === false ? '✓' : '?'}
+                  </div>
+                  <div>
+                    <p className="font-bold text-white text-lg">{latestGuess.location}</p>
+                    <p className="text-white/90 text-sm">
+                      {latestGuess.pm25 !== null
+                        ? `${latestGuess.pm25.toFixed(1)} µg/m³ - ${latestGuess.isWorse ? 'Worse!' : 'Better than Ennis'}`
+                        : 'No data available'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Results */}
           {guesses.length > 0 && (
-            <div className="mb-8">
+            <div id="results-section" className="mb-8 scroll-mt-24">
               <h3 className="text-lg font-semibold mb-4 text-slate-300">Your Guesses</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                 {guesses.map((result, index) => (
