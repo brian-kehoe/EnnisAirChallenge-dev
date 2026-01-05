@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl:*)",
+      "Bash(node test-openaq.js:*)",
+      "Bash(node test-openaq-simple.js:*)",
+      "Bash(node test-sensor-latest.js:*)",
+      "Bash(del test-openaq*.js)",
+      "Bash(npm test:*)",
+      "Bash(RUN_REAL_OPENAQ_TESTS=true OPENAQ_API_KEY=b4ee840d551e9079752a612bb4a86f75398877fe480129367546370c14e39bf6 npm test:*)",
+      "Bash(node test-route-debug.js:*)",
+      "Bash(npm run build:*)"
+    ]
+  }
+}
